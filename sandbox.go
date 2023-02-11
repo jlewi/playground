@@ -279,7 +279,9 @@ func compileAndRun(ctx context.Context, req *request) (*response, error) {
 		return &response{Errors: removeBanner(br.errorMessage)}, nil
 	}
 
-	execRes, err := sandboxRun(ctx, br.exePath, br.testParam)
+	// jlewihack run locally
+	// execRes, err := sandboxRun(ctx, br.exePath, br.testParam)
+	execRes, err := localRun(ctx, br.exePath, br.testParam)
 	if err != nil {
 		return nil, err
 	}
@@ -404,9 +406,12 @@ func sandboxBuild(ctx context.Context, tmpDir string, in []byte, vet bool) (br *
 	//
 	// This is necessary as .a files are no longer included in GOROOT following
 	// https://go.dev/cl/432535.
-	if err := exec.Command("cp", "-al", "/gocache", goCache).Run(); err != nil {
-		return nil, fmt.Errorf("error copying GOCACHE: %v", err)
-	}
+
+	// DO NOT SUBMIT
+	// jlewihack when running locally /gocache doesn't exist
+	//if err := exec.Command("cp", "-al", "/gocache", goCache).Run(); err != nil {
+	//	return nil, fmt.Errorf("error copying GOCACHE: %v", err)
+	//}
 
 	var goArgs []string
 	if br.testParam != "" {
@@ -416,9 +421,14 @@ func sandboxBuild(ctx context.Context, tmpDir string, in []byte, vet bool) (br *
 	}
 	goArgs = append(goArgs, "-o", br.exePath, "-tags=faketime")
 
-	cmd := exec.Command("/usr/local/go-faketime/bin/go", goArgs...)
+	// DO not submit use the local go binary
+	// jlewihack
+	// cmd := exec.Command("/usr/local/go-faketime/bin/go", goArgs...)
+	cmd := exec.Command("go", goArgs...)
 	cmd.Dir = tmpDir
-	cmd.Env = []string{"GOOS=linux", "GOARCH=amd64", "GOROOT=/usr/local/go-faketime"}
+	// jlewihack
+	// cmd.Env = []string{"GOOS=linux", "GOARCH=amd64", "GOROOT=/usr/local/go-faketime"}
+	cmd.Env = []string{"GOOS=linux", "GOARCH=amd64"}
 	cmd.Env = append(cmd.Env, "GOCACHE="+goCache)
 	cmd.Env = append(cmd.Env, "CGO_ENABLED=0")
 	// Create a GOPATH just for modules to be downloaded
@@ -473,6 +483,39 @@ func sandboxBuild(ctx context.Context, tmpDir string, in []byte, vet bool) (br *
 		}
 	}
 	return br, nil
+}
+
+// localRun runs a Go binary locally
+func localRun(ctx context.Context, exePath string, testParam string) (sandboxtypes.Response, error) {
+	cmd := exec.Command(exePath, testParam)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	//exitCode := 0
+	//if err != nil {
+	//	if ee, ok := err.(*exec.ExitError); ok {
+	//		exitCode = ee.ExitCode()
+	//	} else {
+	//		return sandboxtypes.Response{}, fmt.Errorf("error running program: %v", err)
+	//	}
+	//}
+
+	errMsg := ""
+	if err != nil {
+		errMsg = stderr.String()
+	}
+	resp := sandboxtypes.Response{
+		ExitCode: cmd.ProcessState.ExitCode(),
+		Stdout:   out.Bytes(),
+		Stderr:   stderr.Bytes(),
+		Error:    errMsg,
+	}
+
+	return resp, nil
 }
 
 // sandboxRun runs a Go binary in a sandbox environment.
