@@ -426,9 +426,9 @@ func sandboxBuild(ctx context.Context, tmpDir string, in []byte, vet bool) (br *
 	// cmd := exec.Command("/usr/local/go-faketime/bin/go", goArgs...)
 	cmd := exec.Command("go", goArgs...)
 	cmd.Dir = tmpDir
-	// jlewihack
+	// jlewihack comment this out so we build for the local system
 	// cmd.Env = []string{"GOOS=linux", "GOARCH=amd64", "GOROOT=/usr/local/go-faketime"}
-	cmd.Env = []string{"GOOS=linux", "GOARCH=amd64"}
+	// cmd.Env = []string{"GOOS=linux", "GOARCH=amd64"}
 	cmd.Env = append(cmd.Env, "GOCACHE="+goCache)
 	cmd.Env = append(cmd.Env, "CGO_ENABLED=0")
 	// Create a GOPATH just for modules to be downloaded
